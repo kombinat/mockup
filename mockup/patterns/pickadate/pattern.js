@@ -103,6 +103,7 @@ define([
         selectMonths: true
       },
       time: {
+        interval: 5
       },
       timezone: null,
       classWrapperName: 'pattern-pickadate-wrapper',
