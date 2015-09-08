@@ -39,8 +39,7 @@ toolbar: "undo redo | styleselect | bold italic | alignleft aligncenter alignrig
  *    <form>
  *      <textarea class="pat-tinymce"
  *          data-pat-tinymce='{"relatedItems": {"vocabularyUrl": "/relateditems-test.json" },
- *                            "upload": {"baseUrl": "/", "relativePath": "upload"},
- *                            "pasteImages": true
+ *                            "upload": {"baseUrl": "/", "relativePath": "upload"}
  *                            }'></textarea>
  *    </form>
  *
@@ -133,15 +132,15 @@ define([
         insertHeading: _t('Insert link'),
         title: _t('Title'),
         internal: _t('Internal'),
-        external: _t('External'),
-        email: _t('Email'),
+        external: _t('External URL (can be relative within this site or absolute if it starts with http:// or https://)'),
+        email: _t('Email Address'),
         anchor: _t('Anchor'),
-        subject: _t('Subject'),
+        subject: _t('Email Subject (optional)'),
         image: _t('Image'),
         imageAlign: _t('Align'),
         scale: _t('Size'),
         alt: _t('Alternative Text'),
-        externalImage: _t('External Image URI')
+        externalImage: _t('External Image URL (can be relative within this site or absolute if it starts with http:// or https://)')
       },
       // URL generation options
       loadingBaseUrl: '../../../bower_components/tinymce-builded/js/tinymce/',
@@ -176,8 +175,7 @@ define([
                  'unlink plonelink ploneimage',
         //'autoresize_max_height': 900,
         'height': 400
-      },
-      pasteImages: false
+      }
     },
     addLinkClicked: function() {
       var self = this;
@@ -230,43 +228,6 @@ define([
       } else {
         self.imageModal.reinitialize();
         self.imageModal.show();
-      }
-    },
-    addImagePasted: function(file){
-      var self = this;
-      if (self.pasteModal === null) {
-        var linkTypes = ['uploadImage'];
-        /*if(!self.options.upload){
-          linkTypes.splice(1, 1);
-        }*/
-        var options = $.extend(true, {}, self.options, {
-          tinypattern: self,
-          linkTypes: linkTypes,
-          initialLinkType: 'uploadImage',
-          text: {
-            insertHeading: _t('Insert Image')
-          },
-          /*relatedItems: {
-            baseCriteria: [{
-              i: 'portal_type',
-              o: 'plone.app.querystring.operation.list.contains',
-              v: self.options.imageTypes.concat(self.options.folderTypes)
-            }],
-            selectableTypes: self.options.imageTypes,
-            resultTemplate: ResultTemplate,
-            selectionTemplate: SelectionTemplate
-          }*/
-        });
-        var $el = $('<div/>').insertAfter(self.$el);
-        self.pasteModal = new LinkModal($el, options);
-        self.pasteModal.options.upload.clipboardfile = file;
-        self.pasteModal.show();
-        $('a[href=' + $('.linkType.uploadImage legend').attr('id') + ']').click();
-      } else {
-        self.pasteModal.reinitialize();
-        self.pasteModal.options.upload.clipboardfile = file;
-        self.pasteModal.show();
-        $('a[href=' + $('.linkType.uploadImage legend').attr('id') + ']').click();
       }
     },
     generateUrl: function(data) {
@@ -327,7 +288,7 @@ define([
       var self = this;
       var i18n = new I18n();
       var lang = i18n.currentLanguage;
-      if (lang !== 'en' && self.options.tiny.language !== 'en') {
+      if (lang !== 'en-us' && self.options.tiny.language !== 'en') {
         tinymce.baseURL = self.options.loadingBaseUrl;
         // does the expected language exist?
         $.ajax({
@@ -342,7 +303,9 @@ define([
             // expected lang not available, let's fallback to closest one
             if (lang.split('_') > 1){
               lang = lang.split('_')[0];
-            } else {
+            } else if(lang.split('-') > 1){
+              lang = lang.split('-')[0];
+            }else {
               lang = lang + '_' + lang.toUpperCase();
             }
             $.ajax({
@@ -373,12 +336,6 @@ define([
       tinyOptions.addLinkClicked = function() {
         self.addLinkClicked.apply(self, []);
       };
-      if(self.options.pasteImages){
-        tinyOptions.paste_data_images = 'true';
-        tinyOptions.addImagePasted = function() {
-          self.addImagePasted.apply(self, []);
-        };
-      }
       tinyOptions.addImageClicked = function(file) {
         self.addImageClicked.apply(self, [file] );
       };

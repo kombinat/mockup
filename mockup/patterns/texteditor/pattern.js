@@ -95,7 +95,7 @@ define([
       // set id on current element
       var id = utils.setId(self.$el);
       self.$wrapper = $('<div class="editorWrapper" />').css({
-        height: self.options.height + 25, // weird sizing issue here...
+        height: parseInt(self.options.height) + 25, // weird sizing issue here...
         width: self.options.width,
         position: 'relative'
       });
@@ -130,6 +130,7 @@ define([
         'html': 'html',
         'xml': 'xml',
         'less': 'less',
+        'py': 'python',
         'cfg': 'ini'
       };
 
@@ -147,7 +148,9 @@ define([
     },
     setText: function(data) {
       var self = this;
-      self.editor.setValue(data);
+      if(self.editor){
+        self.editor.setValue(data);
+      }
     }
   });
 

@@ -1,8 +1,155 @@
 Changelog
 =========
 
-2.0.5 (unreleased)
+2.0.7 (Unreleased)
 ------------------
+
+- No changes yet.
+
+
+2.0.7 (2015-09-07)
+------------------
+
+- Fix structure pattern sorting
+  [vangheem]
+
+- checkout tinymce language with ``-`` in addition to ``_``
+  [vangheem]
+
+2.0.6 (2015-08-23)
+------------------
+
+- Improvements to dynamic popover content handling
+  [vangheem]
+
+- Lessbuilder will now guess filenames based on manifest.cfg
+  [obct537]
+
+- Filemanager popovers will now close on file change
+  [obct537]
+
+- Added button to clear the sitewide theme cache to the thememapper interface
+  [obct537]
+
+- Querystring pattern: Create date widgets with existing data, if present.
+  Also subscribe to the ``updated.pickadate.patterns`` to update values when
+  date widgets change.
+  [frapell]
+
+- Pickadate pattern: Set the value using the .val() method
+  [frapell]
+
+- Pickadate pattern: Allow to choose format to be used when creating widget
+  with existing data, and use that to format the returned value.
+  [frapell]
+
+- add action value to form when using disableAjaxFormSubmit option on modal
+  [vangheem]
+
+- Modal Pattern: If ``data-view-url`` attribute is available on the body, use
+  it. Otherwise look for ``data-base-url`` and finally for a ``<base>`` tag.
+  [ale-rt]
+
+- filemanager will now re-open files to the same line/position as when it was closed
+  [obct537]
+
+- Fixed "less is not defined" error while in production mode
+  [obct537]
+
+- lessbuilder will now use relative urls
+  [obct537]
+
+- add "Save As" option in less builder
+  [obct537]
+
+- add Refresh button to filemanager
+  [obct537]
+
+- filemanager tree now remains open after add/delete/rename/upload
+  [obct537]
+
+- changed styling in thememapper/filemanager to be more consistent and user friendly
+  [obct537]
+
+- better interaction with insert uploaded image/link in tinymce
+  [vangheem]
+
+- add plone primary button styles for insert tinymce modals
+  [vangheem]
+
+- better interaction with insert uploaded image/link in tinymce
+  [vangheem]
+
+- add plone primary button styles for insert tinymce modals
+  [vangheem]
+
+- remove unused tablesorter pattern
+  [vangheem]
+
+- switch to tab where link/image data is loaded from on tinymce pattern
+  [vangheem]
+
+- detect valid url on tinymce external
+  [vangheem]
+
+- add Python syntax coloring in text editor
+  [ebrehault]
+
+
+2.0.5 (2015-07-18)
+------------------
+
+- add optional setTitle option to pat-moment, put timestamp in element title
+  [braytonosg]
+
+- fix pickadate default timezone to work even if the default isn't the
+  last timezone in the list
+  [braytonosg]
+
+- remove add menu from structure as we will rely on toolbar add menu
+  for this functionality
+  [vangheem]
+
+- give stronger warning with rearrange feature, specially on root
+  [vangheem]
+
+- show quick view for items in structure row
+  [vangheem]
+
+- upgrade mockup-core to 2.1.10
+  [vangheem]
+
+- fix inserting image right after you upload it in tinymce
+  [vangheem]
+
+- Accessibility fixes for structure:
+    - label "cog"/actions
+    - provide title attribute on buttons
+    - add aria-hidden true/false attrs and role=tooltip for popovers
+  [vangheem]
+
+- remove accessibility pattern. see
+    https://github.com/plone/Products.CMFPlone/issues/627
+    https://github.com/plone/Products.CMFPlone/issues/348
+
+- be able to specify not submit modal forms with ajax
+  [vangheem]
+
+- Fix 'Reserved Order' typo
+  [frapell]
+
+- add feature detection support to upload pattern usage. Upload pattern
+  will not work without drag n' drop and file api.
+  [vangheem]
+
+- rename structure "breadcrumbs" class to "fc-breadcrumbs" to prevent name clashes
+
+- fix select2 widget's use of allowNewItems so that we can restrict select2
+  value to only what is in the vocabulary
+
+- rename "columns" and "selected" structure popover classes to "attribute-columns"
+  and "selected-items" to prevent the possibility of clashing with other css
+  as they are common class names.
 
 - Update structure pattern to have buttons be more generic and extensible
   [vangheem]

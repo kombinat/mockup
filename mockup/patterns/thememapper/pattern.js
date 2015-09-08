@@ -37,10 +37,11 @@ define([
   'mockup-patterns-thememapper-url/js/rulebuilder',
   'mockup-patterns-thememapper-url/js/rulebuilderview',
   'mockup-patterns-thememapper-url/js/lessbuilderview',
+  'mockup-patterns-thememapper-url/js/cacheview',
   'mockup-ui-url/views/button',
   'mockup-ui-url/views/buttongroup',
   'mockup-utils'
-], function($, Base, _, _t, InspectorTemplate, FileManager, RuleBuilder, RuleBuilderView, LessBuilderView, ButtonView, ButtonGroup, utils) {
+], function($, Base, _, _t, InspectorTemplate, FileManager, RuleBuilder, RuleBuilderView, LessBuilderView, CacheView, ButtonView, ButtonGroup, utils) {
   'use strict';
 
   var inspectorTemplate = _.template(InspectorTemplate);
@@ -282,6 +283,8 @@ define([
     unthemedInspector: null,
     ruleBuilder: null,
     rulebuilderView: null,
+    devPath: null,
+    prodPath: null,
     lessUrl: null,
     lessPaths: {},
     lessVariableUrl: null,
@@ -306,6 +309,9 @@ define([
       self.editable = (self.options.editable == "True") ? true : false;
       self.lessUrl = (self.options.lessUrl !== undefined ) ? self.options.lessUrl : false;
       self.lessVariableUrl = (self.options.lessVariables !== undefined ) ? self.options.lessVariables : false;
+
+      self.devPath = [];
+      self.prodPath = [];
 
       self.options.filemanagerConfig.uploadUrl = self.options.themeUrl;
       self.options.filemanagerConfig.theme = true;
@@ -334,7 +340,7 @@ define([
       });
       self.fileManager.$tree.bind('tree.click', function(e){
       });
-      self.buildLessButton.$el.hide();
+      self.buildLessButton.disable();
 
       if( !self.editable ) {
         if( self.fileManager.toolbar ) {
@@ -342,22 +348,49 @@ define([
           $(items).each(function() {
             this.disable();
           });
+          self.lessbuilderView.triggerView.disable();
         }
       };
 
       // initially, let's hide the panels
       self.hideInspectors();
+      self.getManifest();
+    },
+    getManifest: function() {
+      var self = this;
+
+      self.fileManager.doAction('getFile', {
+        datatype: 'json',
+        data: {
+          path: 'manifest.cfg'
+        },
+        success: function(data) { this.setDefaultPaths(data); }.bind(self)
+      })
+    },
+    setSavePath: function() {
+        var self = this;
+        var filename = self.lessbuilderView.$filename.val()
+
+        if( filename == "" ) {
+            filename = self.lessbuilderView.$filename.attr('placeholder');
+        }
+
+        var s = self.lessPaths['save'];
+        var folder = s.substr(0, s.lastIndexOf('/'));
+
+        var savePath = folder + '/' + filename;
+        self.lessPaths['save'] = savePath;
     },
     setLessPaths: function(node) {
       var self = this;
 
       if( node.fileType == "less" ){
-        self.buildLessButton.$el.show();
+        self.buildLessButton.enable();
       }
       else{
-        self.buildLessButton.$el.hide();
+        self.buildLessButton.disable();
       }
-      
+
       if( node.path != "" ) {
         var reg = new RegExp("/(.*\\.)less$", "m");
         var path = reg.exec(node.path);
@@ -383,28 +416,42 @@ define([
         return false;
       }
     },
-    saveThemeCSS: function() {
-      var self = this.env;
-      var css = self.$styleBox.html();
+    setDefaultPaths: function(manifest) {
+      var self = this;
+      var dev = new RegExp("development-css\\s*=\\s*\\/\\+\\+theme\\+\\+.*?\\/(.*)");
+      var prod = new RegExp("production-css\\s*=\\s*\\/\\+\\+theme\\+\\+.*?\\/(.*)");
 
-      if( css === "" ) {
+      var devUrl = dev.exec(manifest.contents)[1];
+      var prodUrl = prod.exec(manifest.contents)[1];
+
+      //The array lets us get around scoping issues.
+      self.devPath[0] = devUrl;
+      self.prodPath[0] = prodUrl;
+    },
+    saveThemeCSS: function(styles) {
+      var self = this.env;
+
+      if( styles === "" || styles === undefined ) {
         //There was probably a problem during compilation
         return false;
       }
+
+      self.setSavePath();
 
       self.fileManager.doAction('saveFile', {
         type: 'POST',
         data: {
           path: self.lessPaths['save'],
-          data: css,
+          relativeUrls: true,
+          data: styles,
           _authenticator: utils.getAuthenticator()
         },
         success: function(data) {
           self.fileManager.refreshTree(function() {
             //We need to make sure we open the newest version
             delete self.fileManager.fileData['/' + self.lessPaths['save']]
-            self.fileManager.openFileByPath(self.lessPaths['save'])
-          }); 
+            self.fileManager.selectItem(self.lessPaths['save'])
+          });
           self.lessbuilderView.end();
         }
       });
@@ -436,6 +483,7 @@ define([
       self.showInspectorsButton = new ButtonView({
         id: 'showinspectors',
         title: _t('Show inspectors'),
+        icon: 'search',
         tooltip: _t('Show inspector panels'),
         context: 'default'
       });
@@ -450,12 +498,14 @@ define([
       self.buildRuleButton = new ButtonView({
         id: 'buildrule',
         title: _t('Build rule'),
+        icon: 'wrench',
         tooltip: _t('rule building wizard'),
         context: 'default'
       });
       self.fullscreenButton = new ButtonView({
         id: 'fullscreenEditor',
         title: _t('Fullscreen'),
+        icon: 'fullscreen',
         tooltip: _t('view the editor in fullscreen'),
         context: 'default'
       });
@@ -474,6 +524,7 @@ define([
       self.previewThemeButton = new ButtonView({
         id: 'previewtheme',
         title: _t('Preview theme'),
+        icon: 'new-window',
         tooltip: _t('preview theme in a new window'),
         context: 'default'
       });
@@ -483,12 +534,31 @@ define([
       self.buildLessButton = new ButtonView({
         id: 'buildless',
         title: _t('Build CSS'),
+        icon: 'cog',
         tooltip: _t('Compile LESS file'),
+        context: 'default'
+      });
+      self.refreshButton = new ButtonView({
+        id: 'refreshButton ',
+        title: _t('Refresh'),
+        icon: 'refresh',
+        tooltip: _t('Reload the current file'),
+        context: 'default'
+      });
+      self.refreshButton.on("button:click", function() {
+        self.fileManager.refreshFile();
+      });
+      self.cacheButton = new ButtonView({
+        id: 'cachebutton',
+        title: _t('Clear cache'),
+        icon: 'floppy-remove',
+        tooltip: _t('Clear site\'s theme cache'),
         context: 'default'
       });
       self.helpButton = new ButtonView({
         id: 'helpbutton',
         title: _t('Help'),
+        icon: 'question-sign',
         tooltip: _t('Show help'),
         context: 'default'
       });
@@ -499,6 +569,10 @@ define([
         triggerView: self.buildRuleButton,
         app: self
       });
+      self.cacheView = new CacheView({
+        triggerView: self.cacheButton,
+        app: self
+      })
       self.lessbuilderView = new LessBuilderView({
         triggerView: self.buildLessButton,
         app: self
@@ -510,12 +584,15 @@ define([
           self.previewThemeButton,
           self.fullscreenButton,
           self.buildLessButton,
+          self.refreshButton,
+          self.cacheButton,
           self.helpButton
         ],
         id: 'mapper'
       });
       $('#toolbar .navbar', self.$el).append(self.buttonGroup.render().el);
       $('#toolbar .navbar', self.$el).append(self.rulebuilderView.render().el);
+      $('#toolbar .navbar', self.$el).append(self.cacheView.render().el);
       $('#toolbar .navbar', self.$el).append(self.lessbuilderView.render().el);
     }
   });

@@ -13,8 +13,6 @@ define([
   'use strict';
 
   var LinkType = Base.extend({
-    name: 'linktype',
-    trigger: '.pat-linktype',
     defaults: {
       linkModal: null // required
     },
@@ -24,11 +22,14 @@ define([
       this.tinypattern = this.options.tinypattern;
       this.tiny = this.tinypattern.tiny;
       this.dom = this.tiny.dom;
-      this.$input = this.$el.find('input');
+    },
+
+    getEl: function(){
+      return this.$el.find('input');
     },
 
     value: function() {
-      return this.$input.val();
+      return this.getEl().val();
     },
 
     toUrl: function() {
@@ -36,11 +37,11 @@ define([
     },
 
     load: function(element) {
-      this.$input.attr('value', this.tiny.dom.getAttrib(element, 'data-val'));
+      this.getEl().attr('value', this.tiny.dom.getAttrib(element, 'data-val'));
     },
 
     set: function(val) {
-      this.$input.attr('value', val);
+      this.getEl().attr('value', val);
     },
 
     attributes: function() {
@@ -50,20 +51,42 @@ define([
     }
   });
 
+  var ExternalLink = LinkType.extend({
+    init: function() {
+      LinkType.prototype.init.call(this);
+      this.getEl().on('change', function(){
+        // check here if we should automatically add in http:// to url
+        var val = $(this).val();
+        if((new RegExp("https?\:\/\/")).test(val)){
+          // already valid url
+          return;
+        }
+        var domain = $(this).val().split('/')[0];
+        if(domain.indexOf('.') !== -1){
+          $(this).val('http://' + val);
+        }
+      });
+    }
+  });
+
   var InternalLink = LinkType.extend({
     init: function() {
       LinkType.prototype.init.call(this);
-      this.$input.addClass('pat-relateditems');
+      this.getEl().addClass('pat-relateditems');
       this.createRelatedItems();
     },
 
+    getEl: function(){
+      return this.$el.find('input:not(.select2-input)');
+    },
+
     createRelatedItems: function() {
-      this.relatedItems = new RelatedItems(this.$input,
+      this.relatedItems = new RelatedItems(this.getEl(),
         this.linkModal.options.relatedItems);
     },
 
     value: function() {
-      var val = this.$input.select2('data');
+      var val = this.getEl().select2('data');
       if (val && typeof(val) === 'object') {
         val = val[0];
       }
@@ -85,11 +108,12 @@ define([
     },
 
     set: function(val) {
+      var $el = this.getEl();
       // kill it and then reinitialize since select2 will load data then
-      this.$input.select2('destroy');
-      this.$input.attr('data-relateditems', undefined); // reset the pattern
-      this.$input.parent().replaceWith(this.$input);
-      this.$input.attr('value', val);
+      $el.select2('destroy');
+      $el.removeData('pattern-relateditems'); // reset the pattern
+      $el.parent().replaceWith($el);
+      $el.attr('value', val);
       this.createRelatedItems();
     },
 
@@ -104,11 +128,32 @@ define([
     }
   });
 
-  var UploadLink = InternalLink.extend({
-    toUrl: function() {
-      // Make a URL from the servers uuid of the uploaded file.
-      var upload_data = $('.pat-upload').data('uploaddata');
-      return 'resolveuid/' + upload_data.UID;
+  var UploadLink = LinkType.extend({
+    /* need to do it a bit differently here.
+       when a user uploads and tries to upload from
+       it, you need to delegate to the real insert
+       linke types */
+    getDelegatedLinkType: function(){
+      if(this.linkModal.linkType === 'uploadImage'){
+        return this.linkModal.linkTypes.image;
+      }else{
+        return this.linkModal.linkTypes.internal;
+      }
+    },
+    toUrl: function(){
+      return this.getDelegatedLinkType().toUrl();
+    },
+    attributes: function(){
+      return this.getDelegatedLinkType().attributes();
+    },
+    set: function(val){
+      return this.getDelegatedLinkType().set(val);
+    },
+    load: function(element){
+      return this.getDelegatedLinkType().load(element);
+    },
+    value: function(){
+      return this.getDelegatedLinkType().value();
     }
   });
 
@@ -255,36 +300,6 @@ define([
   });
 
   tinymce.PluginManager.add('ploneimage', function(editor) {
-      if(editor.settings.paste_data_images){
-        editor.on('paste', function(e){
-          var target = $(e.currentTarget);
-          var counter = 0;
-          function handlePaste(){
-            if($('img', target).length > 0){
-              // TODO: more options?
-              $('img', target).each(function(i,e){
-                if($(e).attr('src').indexOf('data:image') === 0){
-                  var byteString = atob($(e).attr('src').split(',')[1]);
-                  var ia = new Uint8Array(byteString.length);
-                  for (var i = 0; i < byteString.length; i++) {
-                    ia[i] = byteString.charCodeAt(i);
-                  }
-                  var blob = new Blob([ia],  {type: 'image/png'});
-                  editor.settings.addImagePasted(blob);
-                }
-              });
-              $('img', target).remove();
-            }else{
-              // wait for image to be pasted
-              if(counter < 3){
-                counter += 1;
-                setTimeout(handlePaste, 1);                
-              }
-            }
-          }
-          handlePaste();
-        });
-      }
     editor.addButton('ploneimage', {
       icon: 'image',
       tooltip: 'Insert/edit image',
@@ -355,7 +370,7 @@ define([
       linkTypeClassMapping: {
         'internal': InternalLink,
         'upload': UploadLink,
-        'external': LinkType,
+        'external': ExternalLink,
         'email': EmailLink,
         'anchor': AnchorLink,
         'image': ImageLink,
@@ -536,11 +551,13 @@ define([
         self.options.upload.relatedItems.selectableTypes = self.options.folderTypes;
         self.$upload.addClass('pat-upload').patternUpload(self.options.upload);
         self.$upload.on('uploadAllCompleted', function(evt, data) {
-          // Add upload data and path_uid to the upload node's data attributes.
-          self.$upload.attr({
-            'data-uploaddata': data.data,
-            'data-path': data.path_uid
-          });
+          if(self.linkTypes.image){
+            self.linkTypes.image.set(data.data.UID);
+            $('#tinylink-image' , self.modal.$modal).trigger('click');
+          }else{
+            self.linkTypes.internal.set(data.data.UID);
+            $('#tinylink-internal', self.modal.$modal).trigger('click');
+          }
         });
       }
 
@@ -607,7 +624,10 @@ define([
             self.linkType = linkType;
             self.linkTypes[self.linkType].load(self.imgElm);
             var scale = self.dom.getAttrib(self.imgElm, 'data-scale');
-            self.$scale.val(scale);
+            if(scale){
+              self.$scale.val(scale);
+            }
+            $('#tinylink-' + self.linkType, self.modal.$modal).trigger('click');
           }else if (src) {
             self.guessImageLink(src);
           }
@@ -630,6 +650,7 @@ define([
         if (linkType) {
           self.linkType = linkType;
           self.linkTypes[self.linkType].load(self.anchorElm);
+          $('#tinylink-' + self.linkType, self.modal.$modal).trigger('click');
         }else if (href) {
           self.guessAnchorLink(href);
         }

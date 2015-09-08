@@ -22,17 +22,34 @@ define([
     },
     deleteButtonClicked: function(e) {
       var self = this;
+      var path = self.app.getNodePath();
+      if( path === undefined ) {
+        alert("No file selected.");
+        return;
+      }
       self.app.doAction('delete', {
         type: 'POST',
         data: {
-          path: self.app.getNodePath()
+          path: path
         },
         success: function(data) {
           self.hide();
-          self.app.refreshTree()
+          self.data = data;
+          self.app.refreshTree(function() {
+
+            var parent = self.data.path;
+            parent = parent.substr(0, parent.lastIndexOf('/'));
+
+            var node = self.app.getNodeByPath(parent);
+            if( node !== null ) {
+                self.app.$tree.tree('openNode', node);
+            }
+
+            delete self.app.fileData[self.data.path];
+            delete self.data;
+          });
+          self.app.closeTab(data.path);
           self.app.resizeEditor();
-          // ugly, $tabs should have an API
-          $('.nav .active .remove').click();
         }
       });
       // XXX show loading

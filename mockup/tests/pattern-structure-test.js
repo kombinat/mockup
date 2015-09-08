@@ -148,7 +148,7 @@ define([
       cb[0].checked = true;
       cb.trigger('change');
       this.clock.tick(500);
-      expect(this.$el.find('#btn-selected').html()).to.contain('1');
+      expect(this.$el.find('#btn-selected-items').html()).to.contain('1');
     });
 
     it('remove item from selection well', function() {
@@ -158,7 +158,7 @@ define([
       $item1[0].checked = true;
       $item1.trigger('change');
       this.$el.find('.items.popover-content a.remove').trigger('click').trigger('change');
-      expect(this.$el.find('#btn-selected').html()).to.contain('0');
+      expect(this.$el.find('#btn-selected-items').html()).to.contain('0');
     });
 
     it('remove all from selection well', function() {
@@ -172,10 +172,10 @@ define([
       $item2[0].checked = true;
       $item2.trigger('change');
       this.clock.tick(1000);
-      expect(this.$el.find('#btn-selected').html()).to.contain('2');
-      this.$el.find('.popover.selected a.remove-all').trigger('click');
+      expect(this.$el.find('#btn-selected-items').html()).to.contain('2');
+      this.$el.find('.popover.selected-items a.remove-all').trigger('click');
       this.clock.tick(1000);
-      expect(this.$el.find('#btn-selected').html()).to.contain('0');
+      expect(this.$el.find('#btn-selected-items').html()).to.contain('0');
     });
 
     it('paging', function() {
@@ -219,7 +219,7 @@ define([
       registry.scan(this.$el);
       this.clock.tick(1000);
       var $popover = this.$el.find('.popover.rearrange');
-      this.$el.find('#rearrange').trigger('click');
+      this.$el.find('#btn-rearrange').trigger('click');
       expect($popover.hasClass('active')).to.equal(true);
       $popover.find('button').trigger('click');
       this.clock.tick(1000);
@@ -229,40 +229,37 @@ define([
 
     it('test select all', function() {
       registry.scan(this.$el);
-      var pattern = this.$el.data('patternStructure');
       this.clock.tick(1000);
       var $item = this.$el.find('table th .select-all');
       $item[0].checked = true;
       $item.trigger('change');
       this.clock.tick(1000);
-      expect(this.$el.find('#btn-selected').html()).to.contain('16');
+      expect(this.$el.find('#btn-selected-items').html()).to.contain('16');
 
     });
 
-    it.skip('test unselect all', function() {
-      /* XXX chrome test failures, blah... */
+    it('test unselect all', function() {
       registry.scan(this.$el);
-      var pattern = this.$el.data('patternStructure');
       this.clock.tick(1000);
       var $item = this.$el.find('table th .select-all');
       $item[0].checked = true;
       $item.trigger('change');
-      expect(this.$el.find('#btn-selected').html()).to.contain('16');
+      this.clock.tick(1000);
+      expect(this.$el.find('#btn-selected-items').html()).to.contain('16');
       $item[0].checked = false;
       $item.trigger('change');
-      expect(this.$el.find('#btn-selected').html()).to.contain('0');
+      this.clock.tick(1000);
+      expect(this.$el.find('#btn-selected-items').html()).to.contain('0');
     });
 
     it('test current folder buttons do not show on root', function() {
       registry.scan(this.$el);
-      var pattern = this.$el.data('patternStructure');
       this.clock.tick(1000);
       expect(this.$el.find('.context-buttons').length).to.equal(0);
     });
 
     it('test current folder buttons do show on subfolder', function() {
       registry.scan(this.$el);
-      var pattern = this.$el.data('patternStructure');
       this.clock.tick(1000);
       var $item = this.$el.find('.itemRow').eq(0);
       $('.title a', $item).trigger('click');
@@ -277,11 +274,11 @@ define([
       var $item = this.$el.find('.itemRow').eq(0);
       $('.title a', $item).trigger('click');
       this.clock.tick(1000);
-      var $checkbox = $('.breadcrumbs-container input[type="checkbox"]', this.$el);
+      var $checkbox = $('.fc-breadcrumbs-container input[type="checkbox"]', this.$el);
       $checkbox[0].checked = true;
       $checkbox.trigger('change');
       this.clock.tick(1000);
-      expect(this.$el.find('#btn-selected').html()).to.contain('1');
+      expect(this.$el.find('#btn-selected-items').html()).to.contain('1');
     });
 
   });

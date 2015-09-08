@@ -74,7 +74,7 @@ define([
     }, {
       name: 'deps',
       title: _t('Dependencies'),
-      description: _t('Coma separated values of resources for requirejs shim')
+      description: _t('Comma-separated values of resources for requirejs shim')
     }, {
       name: 'export',
       title: _t('Export'),
@@ -537,7 +537,11 @@ define([
           self.options.data.resources[name] = {
             enabled: true
           };
-          self.items.resources[name].editResource();
+          if(activeResource.type === 'bundle'){
+            self.items.bundles[name].editResource();
+          }else{
+            self.items.resources[name].editResource();
+          }
         }
       });
     },

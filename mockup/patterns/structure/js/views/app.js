@@ -12,7 +12,6 @@ define([
   'mockup-patterns-structure-url/js/views/rearrange',
   'mockup-patterns-structure-url/js/views/selectionbutton',
   'mockup-patterns-structure-url/js/views/paging',
-  'mockup-patterns-structure-url/js/views/addmenu',
   'mockup-patterns-structure-url/js/views/columns',
   'mockup-patterns-structure-url/js/views/textfilter',
   'mockup-patterns-structure-url/js/views/upload',
@@ -25,7 +24,7 @@ define([
 ], function($, _, Backbone, Toolbar, ButtonGroup, ButtonView, BaseView,
             TableView, SelectionWellView,
             GenericPopover, RearrangeView, SelectionButtonView,
-            PagingView, AddMenu, ColumnsView, TextFilterView, UploadView,
+            PagingView, ColumnsView, TextFilterView, UploadView,
             ResultCollection, SelectedCollection, utils, _t, logger) {
   'use strict';
 
@@ -103,11 +102,11 @@ define([
 
       self.wellView = new SelectionWellView({
         collection: self.selectedCollection,
-        triggerView: self.toolbar.get('selected'),
+        triggerView: self.toolbar.get('selected-items'),
         app: self
       });
 
-      self.toolbar.get('selected').disable();
+      self.toolbar.get('selected-items').disable();
       self.buttons.disable();
 
       var timeout = 0;
@@ -158,7 +157,7 @@ define([
         }
       });
 
-      if (self.options.urlStructure && window.history && window.history.pushState){
+      if (self.options.urlStructure && utils.featureSupport.history()){
         $(window).bind('popstate', function () {
           /* normalize this url first... */
           var url = window.location.href;
@@ -193,10 +192,10 @@ define([
     updateButtons: function(){
       var self = this;
       if (self.selectedCollection.length) {
-        self.toolbar.get('selected').enable();
+        self.toolbar.get('selected-items').enable();
         self.buttons.enable();
       } else {
-        this.toolbar.get('selected').disable();
+        this.toolbar.get('selected-items').disable();
         self.buttons.disable();
       }
 
@@ -308,8 +307,8 @@ define([
       var items = [];
 
       var columnsBtn = new ButtonView({
-        id: 'columns',
-        tooltip: 'Configure displayed columns',
+        id: 'attribute-columns',
+        tooltip: _t('Configure displayed columns'),
         icon: 'th'
       });
 
@@ -320,17 +319,17 @@ define([
       items.push(columnsBtn);
 
       items.push(new SelectionButtonView({
-        title: 'Selected',
-        id: 'selected',
+        title: _t('Selected'),
+        id: 'selected-items',
         collection: this.selectedCollection
       }));
 
       if (self.options.rearrange) {
         var rearrangeButton = new ButtonView({
           id: 'rearrange',
-          title: 'Rearrange',
+          title: _t('Rearrange'),
           icon: 'sort-by-attributes',
-          tooltip: 'Rearrange folder contents',
+          tooltip: _t('Rearrange folder contents'),
           url: self.options.rearrange.url
         });
         self.rearrangeView = new RearrangeView({
@@ -339,11 +338,11 @@ define([
         });
         items.push(rearrangeButton);
       }
-      if (self.options.upload) {
+      if (self.options.upload && utils.featureSupport.dragAndDrop() && utils.featureSupport.fileApi()) {
         var uploadButton = new ButtonView({
           id: 'upload',
-          title: 'Upload',
-          tooltip: 'Upload files',
+          title: _t('Upload'),
+          tooltip: _t('Upload files'),
           icon: 'upload'
         });
         self.uploadView = new UploadView({
@@ -351,13 +350,6 @@ define([
           app: self
         });
         items.push(uploadButton);
-      }
-      if (self.options.contextInfoUrl) {
-        // only add menu if set
-        items.push(new AddMenu({
-          contextInfoUrl: self.options.contextInfoUrl,
-          app: self
-        }));
       }
 
       var buttons = [];

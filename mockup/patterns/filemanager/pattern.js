@@ -69,6 +69,7 @@ define([
         '</a>' +
       '</li>'),
     saveBtn: null,
+    uploadFolder: '',
     fileData: {},  /* mapping of files to data that it describes */
     defaults: {
       aceConfig: {},
@@ -86,8 +87,27 @@ define([
         self.$el.html('Must specify actionUrl setting for pattern');
         return;
       }
+
       self.options.treeConfig = $.extend(true, {}, self.treeConfig, {
-        dataUrl: self.options.actionUrl + '?action=dataTree'
+        dataUrl: self.options.actionUrl + '?action=dataTree',
+        onCreateLi: function(node, li) {
+          var imageTypes = ['png', 'jpg', 'jpeg', 'gif', 'ico'];
+          var themeTypes = ['css', 'html', 'htm', 'txt', 'xml', 'js', 'cfg', 'less'];
+
+          $('span', li).addClass('glyphicon');
+          if( node.folder ) {
+            $('span', li).addClass('glyphicon-folder-close')
+          }
+          else if( $.inArray(node.fileType, imageTypes) >= 0) {
+            $('span', li).addClass('glyphicon-picture');
+          }
+          else if( $.inArray(node.fileType, themeTypes) >= 0) {
+            $('span', li).addClass('glyphicon-file');
+          }
+          else {
+            $('span', li).addClass('glyphicon-cog')
+          }
+        }
       });
 
       self.fileData = {};
@@ -95,7 +115,8 @@ define([
       self.saveBtn = new ButtonView({
         id: 'save',
         title: _t('Save'),
-        context: 'success'
+        icon: 'floppy-disk',
+        context: 'primary'
       });
 
       var newFolderView = new NewFolderView({
@@ -103,6 +124,7 @@ define([
           id: 'newfolder',
           title: _t('New folder'),
           tooltip: _t('Add new folder to current directory'),
+          icon: 'folder-open',
           context: 'default'
         }),
         app: self
@@ -112,6 +134,7 @@ define([
           id: 'addnew',
           title: _t('Add new file'),
           tooltip: _t('Add new file to current folder'),
+          icon: 'file',
           context: 'default'
         }),
         app: self
@@ -121,6 +144,7 @@ define([
           id: 'rename',
           title: _t('Rename'),
           tooltip: _t('Rename currently selected resource'),
+          icon: 'random',
           context: 'default'
         }),
         app: self
@@ -130,6 +154,7 @@ define([
           id: 'delete',
           title: _t('Delete'),
           tooltip: _t('Delete currently selected resource'),
+          icon: 'trash',
           context: 'danger'
         }),
         app: self
@@ -142,20 +167,31 @@ define([
         deleteView
       ];
       var mainButtons = [
+        self.saveBtn,
         newFolderView.triggerView,
-        addNewView.triggerView
+        addNewView.triggerView,
+        renameView.triggerView,
+        deleteView.triggerView
       ];
 
-      if (self.options.uploadUrl){
+      if (self.options.uploadUrl && utils.featureSupport.dragAndDrop() && utils.featureSupport.fileApi()){
         var uploadView = new UploadView({
           triggerView: new ButtonView({
             id: 'upload',
             title: _t('Upload'),
             tooltip: _t('Upload file to current directory'),
+            icon: 'upload',
             context: 'default'
           }),
           app: self,
-          callback: self.refreshTree
+          callback: function(data) {
+            var path = self.uploadFolder + '/' + data.name;
+            self.refreshTree(function() {
+              self.selectItem(path);
+              self.getUpload().toggle();
+            });
+
+          }
         });
         self.views.push(uploadView);
         mainButtons.push(uploadView.triggerView);
@@ -180,20 +216,17 @@ define([
             items: mainButtons,
             id: 'main',
             app: self
-          }),
-          new ButtonGroup({
-            items: [
-              renameView.triggerView,
-              deleteView.triggerView
-            ],
-            id: 'secondary',
-            app: self
-          }),
-          self.saveBtn
+          })
         ]
       });
 
       self._save = function() {
+
+        var path = self.getNodePath();
+        if( path === undefined ) {
+          alert("No file selected.");
+          return;
+        }
         self.doAction('saveFile', {
           type: 'POST',
           data: {
@@ -220,7 +253,7 @@ define([
       if( callback === undefined ) {
         callback = function() {};
       }
-      self.$tree.tree('loadDataFromUrl', 
+      self.$tree.tree('loadDataFromUrl',
         self.options.actionUrl + '?action=dataTree',
         null,
         callback
@@ -236,23 +269,151 @@ define([
       self.$tree = self.$('.tree');
       self.$nav = self.$('nav');
       self.$tabs = $('ul.nav', self.$nav);
-      self.options.treeConfig.onLoad = function() {
-        // on loading initial data, activate first node if available
-        var node = self.$tree.tree('getNodeById', 1);
-        if (node){
-          self.$tree.tree('selectNode', node);
-          self.openFile({node: node});
-        }
-      };
       self.tree = new Tree(self.$tree, self.options.treeConfig);
-      self.$tree.bind('tree.click', function(e) {
-        self.openFile(e);
-      });
       self.$editor = self.$('.editor');
 
+      self.$tree.bind('tree.select', function(e) {
+        if( e.node === null ) {
+          self.toggleButtons(false);
+        }
+        else{
+          self.toggleButtons(true);
+          self.handleClick(e);
+        }
+      });
+
+      self.$tree.bind('tree.open', function(e) {
+        var element = $(e.node.element).find(':first').find('.glyphicon');
+        $(element).addClass('glyphicon-folder-open');
+        $(element).removeClass('glyphicon-folder-close');
+      });
+
+      self.$tree.bind('tree.close', function(e) {
+        var element = $(e.node.element).find(':first').find('.glyphicon');
+        $(element).addClass('glyphicon-folder-close');
+        $(element).removeClass('glyphicon-folder-open');
+      });
+
+      self.$tree.bind('tree.init', function(e) {
+        var node = self.$tree.tree('getTree').children[0];
+        if( node ) {
+          self.$tree.tree('selectNode', node);
+        }
+      });
+
+      $(self.$tabs).on('click', function(e) {
+        var path = $(e.target).data('path');
+        if( path === undefined ) {
+          path = $(e.target.parentElement).data('path');
+          if( path === undefined ) {
+            return false;
+          }
+        }
+        self.selectItem(path);
+      });
       $(window).on('resize', function() {
         self.resizeEditor();
       });
+    },
+    toggleButtons: function(on) {
+      if( on === undefined ) {
+        return;
+      }
+
+      if( on ) {
+        $('#btn-delete', this.$el).attr('disabled', false);
+        $('#btn-save', this.$el).attr('disabled', false);
+        $('#btn-rename', this.$el).attr('disabled', false);
+      }
+      else{
+        $('#btn-delete', this.$el).attr('disabled', 'disabled');
+        $('#btn-save', this.$el).attr('disabled', 'disabled');
+        $('#btn-rename', this.$el).attr('disabled', 'disabled');
+      }
+    },
+    handleClick: function(event) {
+      var self = this;
+      self.closeActivePopovers();
+      self.openFile(event);
+    },
+    closeActiveTab: function() {
+      var self = this;
+      var active = self.$tabs.find('.active .remove');
+      var $siblings = $(active).parent().siblings();
+      if ($siblings.length > 0){
+        var $item;
+        if ($(active).parent().prev().length > 0){
+          $item = $(active).parent().prev();
+        } else {
+          $item = $(active).parent().next();
+        }
+        $(active).parent().remove();
+        $item.click();
+      } else {
+        $(active).parent().remove();
+        self.toggleButtons(false);
+        self.openEditor();
+      }
+    },
+    closeTab: function(path) {
+      var self = this;
+      if( path === undefined ) {
+        return;
+      }
+
+      var tabs = self.$tabs.children();
+
+      $(tabs).each(function() {
+        if( $(this).data('path') == path )
+        {
+          $(this).find('a.remove').trigger('click');
+        }
+      });
+    },
+    closeActivePopovers: function() {
+      var self = this;
+      var active = $('.navbar a.active');
+      $(active).each(function() {
+        $(this).click();
+      });
+    },
+    createTab: function(path) {
+      var self = this;
+      var $item = $(self.tabItemTemplate({path: path}));
+      self.shrinkTab($item);
+      self.$tabs.append($item);
+      $('.remove', $item).click(function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        self.closeActivePopovers();
+        if ($(this).parent().hasClass('active'))
+        {
+          self.closeActiveTab();
+        }
+        else {
+          $(this).parent().remove();
+        }
+      });
+      $('.select', $item).click(function(e){
+        e.preventDefault();
+        $('li', self.$tabs).removeClass('active');
+        var $li = $(this).parent();
+        self.closeActivePopovers();
+        $li.addClass('active');
+      });
+    },
+    updateTabs: function(path) {
+      var self = this;
+      if( path === undefined ) {
+        return;
+      }
+      $('li', self.$tabs).removeClass('active');
+      var $existing = $('[data-path="' + path + '"]', self.$tabs);
+      if ($existing.length === 0){
+        self.createTab(path);
+      }else{
+        $existing.addClass('active');
+      }
     },
     shrinkTab: function(tab) {
         var self = this;
@@ -268,81 +429,55 @@ define([
     },
     openFile: function(event) {
       var self = this;
-      var doc = event.node.path;
+      if( event.node === null ) {
+        return true;
+      }
       if (event.node.folder){
         if( self.options.theme ) {
           self.setUploadUrl(event.node.path);
         }
         return true;
       }
-      if( event.node ) {
-        self.$tree.tree('selectNode', event.node);
-      }
+      var doc = event.node.path;
       if(self.fileData[doc]) {
-        $('li', self.$tabs).removeClass('active');
-        var $existing = $('[data-path="' + doc + '"]');
-        if ($existing.length === 0){
-          var $item = $(self.tabItemTemplate({path: doc}));
-          self.shrinkTab($item);
-          self.$tabs.append($item);
-          $('.remove', $item).click(function(e){
-            e.preventDefault();
-            if ($(this).parent().hasClass('active'))
-            {
-              var $siblings = $(this).parent().siblings();
-              if ($siblings.length > 0){
-                var $item;
-                if ($(this).parent().prev().length > 0){
-                  $item = $(this).parent().prev();
-                } else {
-                  $item = $(this).parent().next();
-                }
-                $item.addClass('active');
-                $(this).parent().remove();
-                self.openFileByPath($item.attr('data-path'));
-              } else {
-                $(this).parent().remove();
-                self.openEditor();
-              }
-            }
-            else {
-              $(this).parent().remove();
-            }
-          });
-          $('.select', $item).click(function(e){
-            e.preventDefault();
-            $('li', self.$tabs).removeClass('active');
-            var $li = $(this).parent();
-            $li.addClass('active');
-            self.openFile({node: event.node});
-          });
-        }else{
-          $existing.addClass('active');
-        }
         self.openEditor(doc);
+
+        var resetLine = function() {
+          if( self.fileData[doc].line === undefined ) {
+            return;
+          }
+          self.ace.editor.scrollToLine(self.fileData[doc].line);
+          self.ace.editor.moveCursorToPosition(self.fileData[doc].cursorPosition)
+          //We only want this to fire after the intial render,
+          //Not after rendering a "scroll" or "focus" event,
+          //So we remove it immediately after.
+          self.ace.editor.renderer.off("afterRender", resetLine);
+        };
+        //This sets the listener before rendering finishes
+        self.ace.editor.renderer.on("afterRender", resetLine);
       } else {
         self.doAction('getFile', {
           data: { path: doc },
           dataType: 'json',
           success: function(data) {
             self.fileData[doc] = data;
-            self.openFile(event);
+            self.openEditor(doc);
           }
         });
       }
     },
-    openFileByPath: function(path) {
+    getNodeByPath: function(path) {
       var self = this;
       if( path === undefined || path === "" )
       {
-       return false;
+       return null;
       }
 
       if( path.indexOf('/') === 0 )
       {
         path = path.substr(1,path.length);
       }
-      
+
       var folders = path.split('/');
       var children = self.$tree.tree('getTree').children;
 
@@ -351,20 +486,18 @@ define([
         for( var z = 0; z < children.length; z++ )
         {
           if( children[z].name == folders[i] ) {
-            if( children[z].folder == true ) {
+            if( children[z].folder == true && i != (folders.length - 1) ) {
               children = children[z].children;
               break;
             }
             else {
-              self.$tree.tree('selectNode', children[z]);
-              self.openFile({node: children[z]});
-              return true;
+              return children[z];
             }
           }
         }
       }
 
-      return false;
+      return null;
     },
     doAction: function(action, options) {
       var self = this;
@@ -384,9 +517,17 @@ define([
     },
     openEditor: function(path) {
       var self = this;
+
+      if( path !== undefined ) {
+          self.updateTabs(path);
+      }
+
       // first we need to save the current editor content
       if(self.currentPath) {
         self.fileData[self.currentPath].contents = self.ace.editor.getValue();
+        var lineNum = self.ace.editor.getFirstVisibleRow();
+        self.fileData[self.currentPath].line = lineNum;
+        self.fileData[self.currentPath].cursorPosition = self.ace.editor.getCursorPosition();
       }
       self.currentPath = path;
       if (self.ace !== undefined){
@@ -407,7 +548,9 @@ define([
       else if( typeof self.fileData[path].info !== 'undefined' )
       {
           var preview = self.fileData[path].info;
-          self.ace.editor.off();
+          if( self.ace.editor !== undefined ) {
+              self.ace.editor.off();
+          }
           $('.ace_editor').empty().append(preview);
       }
       else
@@ -423,6 +566,9 @@ define([
         if (self.ace.editor.curOp && self.ace.editor.curOp.command.name) {
           $('[data-path="' + path + '"]').addClass("modified");
         }
+      });
+      self.ace.editor.on('paste', function() {
+        $('[data-path="' + path + '"]').addClass("modified");
       });
       self.ace.editor.commands.addCommand({
         name: 'saveFile',
@@ -500,9 +646,13 @@ define([
           //This forces ace to redraw if the container has changed size
           self.ace.editor.resize();
           self.ace.editor.$blockScrolling = Infinity;
+          self.ace.editor.focus();
         }
-
-        self.ace.editor.focus();
+    },
+    selectItem: function(path) {
+      var self = this;
+      var node = self.getNodeByPath(path);
+      self.$tree.tree('selectNode', node);
     },
     setUploadUrl: function(path) {
       var self = this;
@@ -511,6 +661,7 @@ define([
         path = "";
       }
 
+      self.uploadFolder = path;
       var view = self.getUpload();
       if( view !== undefined ) {
         var url = self.options.uploadUrl +
@@ -521,6 +672,16 @@ define([
 
         view.upload.dropzone.options.url = url;
       }
+    },
+    refreshFile: function(path) {
+      var self = this;
+
+      if( path === undefined ) {
+        path = self.getSelectedNode().path;
+      }
+      self.closeTab(path);
+      delete self.fileData[path];
+      self.selectItem(path);
     }
   });
 
